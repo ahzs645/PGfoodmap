@@ -31,6 +31,8 @@ const emit = defineEmits(['restaurant-click'])
 const mapContainer = ref(null)
 let map = null
 let popup = null
+let hoverPopup = null
+let hoveredFeatureId = null
 
 // Prince George center coordinates
 const CENTER = [-122.764593, 53.909784]
@@ -78,6 +80,35 @@ function getMarkerColor(restaurant) {
     const rating = restaurant.hazardRatingAtDate || restaurant.current_hazard_rating || restaurant.hazard_rating || 'Unknown'
     return getHazardColor(rating)
   }
+}
+
+function createHoverContent(properties) {
+  const rating = properties.hazard_rating || 'Unknown'
+  const violationCount = properties.violation_count || 0
+
+  const hazardColorClass = rating === 'Low' ? 'bg-green-500'
+    : rating === 'Moderate' ? 'bg-amber-500'
+    : 'bg-gray-500'
+
+  const violationColorClass = violationCount === 0 ? 'bg-green-500'
+    : violationCount <= 3 ? 'bg-yellow-500'
+    : violationCount <= 6 ? 'bg-orange-500'
+    : 'bg-red-500'
+
+  return `
+    <div class="p-2 max-w-xs">
+      <div class="font-semibold text-gray-900 text-sm mb-1">${properties.name}</div>
+      <div class="text-xs text-gray-600 mb-2">${properties.address}</div>
+      <div class="flex items-center gap-1">
+        <span class="text-xs px-1.5 py-0.5 rounded ${hazardColorClass} text-white">
+          ${rating}
+        </span>
+        <span class="text-xs px-1.5 py-0.5 rounded ${violationColorClass} text-white">
+          ${violationCount} violation${violationCount !== 1 ? 's' : ''}
+        </span>
+      </div>
+    </div>
+  `
 }
 
 function createPopupContent(restaurant) {
@@ -209,15 +240,57 @@ function addLayers() {
 
   // Add click handler
   map.on('click', 'restaurants-circle', handleMapClick)
-  map.on('mouseenter', 'restaurants-circle', () => {
+
+  // Add hover handlers for quick preview
+  map.on('mouseenter', 'restaurants-circle', (e) => {
     map.getCanvas().style.cursor = 'pointer'
+
+    if (e.features.length > 0) {
+      const feature = e.features[0]
+      hoveredFeatureId = feature.properties.id
+
+      // Remove existing hover popup if any
+      if (hoverPopup) hoverPopup.remove()
+
+      // Create hover popup
+      hoverPopup = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        maxWidth: '250px',
+        offset: 15,
+        className: 'hover-popup'
+      })
+        .setLngLat(e.lngLat)
+        .setHTML(createHoverContent(feature.properties))
+        .addTo(map)
+    }
   })
+
+  map.on('mousemove', 'restaurants-circle', (e) => {
+    if (e.features.length > 0 && hoverPopup) {
+      hoverPopup.setLngLat(e.lngLat)
+    }
+  })
+
   map.on('mouseleave', 'restaurants-circle', () => {
     map.getCanvas().style.cursor = ''
+    hoveredFeatureId = null
+
+    // Remove hover popup
+    if (hoverPopup) {
+      hoverPopup.remove()
+      hoverPopup = null
+    }
   })
 }
 
 function handleMapClick(e) {
+  // Remove hover popup when clicking
+  if (hoverPopup) {
+    hoverPopup.remove()
+    hoverPopup = null
+  }
+
   if (e.features.length > 0) {
     const feature = e.features[0]
     const restaurant = props.restaurants.find(
@@ -315,6 +388,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (hoverPopup) hoverPopup.remove()
+  if (popup) popup.remove()
   if (map) map.remove()
 })
 
