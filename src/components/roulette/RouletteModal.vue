@@ -2,6 +2,7 @@
 import { ref, watch, onMounted } from 'vue'
 import RouletteFilters from './RouletteFilters.vue'
 import RouletteWheel from './RouletteWheel.vue'
+import RouletteSlot from './RouletteSlot.vue'
 import RouletteResult from './RouletteResult.vue'
 import { useRouletteState } from '../../composables/useRouletteState'
 import { useGeolocation } from '../../composables/useGeolocation'
@@ -31,6 +32,7 @@ const {
   winner,
   winnerIndex,
   hasSpun,
+  spinnerMode,
   wheelSize,
   wheelRestaurants,
   eligibleRestaurants,
@@ -90,7 +92,12 @@ function handleClearLocation() {
 
 // Start spinning
 function handleSpin() {
-  if (wheelRestaurants.value.length === 0) return
+  // Check correct list based on mode
+  if (spinnerMode.value === 'slot') {
+    if (eligibleRestaurants.value.length === 0) return
+  } else {
+    if (wheelRestaurants.value.length === 0) return
+  }
   spin()
 }
 
@@ -198,8 +205,38 @@ function handleKeydown(e) {
           @toggle-hazard="toggleHazardExclusion"
         />
 
-        <!-- Wheel Size & Eligible Count -->
-        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
+        <!-- Spinner Mode Toggle -->
+        <div class="flex items-center justify-center gap-2 p-2 bg-gray-50 dark:bg-gray-900 rounded-xl">
+          <button
+            @click="spinnerMode = 'wheel'"
+            class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+            :class="spinnerMode === 'wheel'
+              ? 'bg-purple-500 text-white'
+              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600'"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke-width="2"/>
+              <path stroke-width="2" d="M12 2v10l7 7"/>
+            </svg>
+            Wheel
+          </button>
+          <button
+            @click="spinnerMode = 'slot'"
+            class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+            :class="spinnerMode === 'slot'
+              ? 'bg-purple-500 text-white'
+              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600'"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <rect x="3" y="4" width="18" height="16" rx="2" stroke-width="2"/>
+              <line x1="3" y1="12" x2="21" y2="12" stroke-width="2"/>
+            </svg>
+            Slot
+          </button>
+        </div>
+
+        <!-- Wheel Size & Eligible Count (only for wheel mode) -->
+        <div v-if="spinnerMode === 'wheel'" class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
           <!-- Wheel size selector -->
           <div class="flex items-center gap-2">
             <span class="text-sm text-gray-600 dark:text-gray-400">Options:</span>
@@ -229,18 +266,32 @@ function handleKeydown(e) {
           </span>
         </div>
 
-        <!-- Wheel or Result -->
+        <!-- Eligible count for slot mode -->
+        <div v-else class="text-center py-2">
+          <span
+            class="text-sm"
+            :class="eligibleRestaurants.length > 0
+              ? 'text-green-600 dark:text-green-400'
+              : 'text-red-600 dark:text-red-400'"
+          >
+            {{ eligibleRestaurants.length }} restaurants available
+          </span>
+        </div>
+
+        <!-- Spinner or Result -->
         <div class="flex flex-col items-center">
+          <!-- Wheel Mode: Show result popup -->
           <RouletteResult
-            v-if="hasSpun && !isSpinning && winner"
+            v-if="spinnerMode === 'wheel' && hasSpun && !isSpinning && winner"
             :winner="winner"
             :is-dark="isDark"
             @spin-again="handleSpinAgain"
             @view-on-map="handleViewOnMap"
           />
 
+          <!-- Wheel Mode: Show wheel -->
           <RouletteWheel
-            v-else
+            v-else-if="spinnerMode === 'wheel'"
             :restaurants="wheelRestaurants"
             :winner-index="winnerIndex"
             :is-spinning="isSpinning"
@@ -248,9 +299,45 @@ function handleKeydown(e) {
             @spin-complete="handleSpinComplete"
           />
 
-          <!-- Reshuffle button (only when not spinning and wheel is visible) -->
+          <!-- Slot Mode: Always show slot (has built-in winner display) -->
+          <RouletteSlot
+            v-else
+            :restaurants="wheelRestaurants"
+            :eligible-restaurants="eligibleRestaurants"
+            :winner-index="winnerIndex"
+            :is-spinning="isSpinning"
+            :is-dark="isDark"
+            @spin-complete="handleSpinComplete"
+          />
+
+          <!-- Slot Mode: Action buttons after spin -->
+          <div
+            v-if="spinnerMode === 'slot' && hasSpun && !isSpinning && winner"
+            class="flex gap-3 mt-4"
+          >
+            <button
+              @click="handleViewOnMap"
+              class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              View on Map
+            </button>
+            <button
+              @click="handleSpinAgain"
+              class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-sm font-medium rounded-lg transition-all flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Spin Again
+            </button>
+          </div>
+
+          <!-- Reshuffle button (only for wheel mode when not spinning) -->
           <button
-            v-if="!hasSpun && !isSpinning && eligibleRestaurants.length > wheelSize"
+            v-if="spinnerMode === 'wheel' && !hasSpun && !isSpinning && eligibleRestaurants.length > wheelSize"
             @click="shuffleWheel"
             class="mt-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
@@ -260,11 +347,11 @@ function handleKeydown(e) {
             Shuffle ({{ eligibleRestaurants.length - wheelSize }} more available)
           </button>
 
-          <!-- Spin button -->
+          <!-- Spin button: show when not spun yet, or while spinning -->
           <button
             v-if="!hasSpun || isSpinning"
             @click="handleSpin"
-            :disabled="wheelRestaurants.length === 0 || isSpinning"
+            :disabled="(spinnerMode === 'slot' ? eligibleRestaurants.length === 0 : wheelRestaurants.length === 0) || isSpinning"
             class="mt-6 px-8 py-4 text-xl font-bold rounded-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white shadow-lg transform transition-all hover:scale-105 active:scale-95 disabled:hover:scale-100"
           >
             <span v-if="isSpinning" class="animate-pulse">Spinning...</span>

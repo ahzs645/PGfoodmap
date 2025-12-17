@@ -75,6 +75,7 @@ export function useRouletteState(allRestaurants) {
   const winner = ref(null)
   const winnerIndex = ref(null) // Index of winner in wheelRestaurants
   const hasSpun = ref(false)
+  const spinnerMode = ref('wheel') // 'wheel' or 'slot'
 
   // Wheel display state
   const wheelSize = ref(8) // How many restaurants to show on wheel
@@ -178,17 +179,24 @@ export function useRouletteState(allRestaurants) {
     wheelRestaurants.value = shuffled.slice(0, Math.min(wheelSize.value, eligible.length))
   }
 
-  // Spin the wheel and select a winner from what's on the wheel
+  // Spin the wheel and select a winner
   function spin() {
-    if (wheelRestaurants.value.length === 0) return null
-
     isSpinning.value = true
     hasSpun.value = true
 
-    // Random selection from wheel restaurants only
-    const idx = Math.floor(Math.random() * wheelRestaurants.value.length)
-    winnerIndex.value = idx
-    winner.value = wheelRestaurants.value[idx]
+    if (spinnerMode.value === 'slot') {
+      // Slot mode: pick from all eligible restaurants
+      if (eligibleRestaurants.value.length === 0) return null
+      const idx = Math.floor(Math.random() * eligibleRestaurants.value.length)
+      winnerIndex.value = idx
+      winner.value = eligibleRestaurants.value[idx]
+    } else {
+      // Wheel mode: pick from wheel restaurants only
+      if (wheelRestaurants.value.length === 0) return null
+      const idx = Math.floor(Math.random() * wheelRestaurants.value.length)
+      winnerIndex.value = idx
+      winner.value = wheelRestaurants.value[idx]
+    }
 
     return winner.value
   }
@@ -240,6 +248,7 @@ export function useRouletteState(allRestaurants) {
     winner,
     winnerIndex,
     hasSpun,
+    spinnerMode,
     // Wheel
     wheelSize,
     wheelRestaurants,
