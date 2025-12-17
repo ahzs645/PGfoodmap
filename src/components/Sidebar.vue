@@ -248,22 +248,26 @@ const hazardColors = {
     </div>
 
     <!-- Selected restaurant detail -->
-    <div v-if="selectedRestaurant" class="p-4 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-800">
-      <div class="flex items-center justify-between mb-2">
-        <span class="text-sm font-medium text-blue-900 dark:text-blue-200">Selected Restaurant</span>
-        <button @click="emit('clear-selection')" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+    <div v-if="selectedRestaurant" class="flex flex-col bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-800 max-h-[40vh] shrink-0">
+      <div class="flex items-center justify-between p-3 shrink-0 gap-2">
+        <span class="text-sm font-medium text-blue-900 dark:text-blue-200">Selected</span>
+        <div class="flex items-center gap-2">
+          <button
+            @click="emit('open-inspection-panel')"
+            class="py-1 px-3 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            View Inspections
+          </button>
+          <button @click="emit('clear-selection')" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
-      <RestaurantCard :restaurant="selectedRestaurant" :expanded="true" :visualization-mode="visualizationMode" />
-      <button
-        @click="emit('open-inspection-panel')"
-        class="mt-3 w-full py-2 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-      >
-        View All Inspections
-      </button>
+      <div class="overflow-y-auto px-3 min-h-0 flex-1">
+        <RestaurantCard :restaurant="selectedRestaurant" :expanded="true" :visualization-mode="visualizationMode" />
+      </div>
     </div>
 
     <!-- Loading state -->
