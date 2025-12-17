@@ -4,10 +4,29 @@ import RestaurantMap from './components/RestaurantMap.vue'
 import Sidebar from './components/Sidebar.vue'
 import InspectionPanel from './components/InspectionPanel.vue'
 import Timeline from './components/Timeline.vue'
+import RouletteModal from './components/roulette/RouletteModal.vue'
 import { useRestaurantData } from './composables/useRestaurantData'
 import { useDarkMode } from './composables/useDarkMode'
 
 const { isDark, toggleDarkMode } = useDarkMode()
+
+// Roulette state
+const showRoulette = ref(false)
+
+function openRoulette() {
+  showRoulette.value = true
+}
+
+function closeRoulette() {
+  showRoulette.value = false
+}
+
+function handleRouletteSelectOnMap(restaurant) {
+  // Close roulette and select the restaurant on the main map
+  showRoulette.value = false
+  selectedRestaurant.value = restaurant
+  showSidebar.value = true
+}
 
 const selectedHazardRatings = ref(['Low', 'Moderate', 'Unknown'])
 const selectedFacilityTypes = ref(['Restaurant', 'Institutional Kitchen', 'Store', 'Unknown', 'Other'])
@@ -231,6 +250,7 @@ function openInspectionPanel() {
       @clear-selection="clearSelection"
       @open-inspection-panel="openInspectionPanel"
       @toggle-dark-mode="toggleDarkMode"
+      @open-roulette="openRoulette"
     />
 
     <!-- Toggle sidebar button -->
@@ -331,6 +351,15 @@ function openInspectionPanel() {
       :restaurant="selectedRestaurant"
       :is-dark="isDark"
       @close="showInspectionPanel = false"
+    />
+
+    <!-- Roulette Modal -->
+    <RouletteModal
+      v-if="showRoulette"
+      :restaurants="restaurants"
+      :is-dark="isDark"
+      @close="closeRoulette"
+      @select-on-map="handleRouletteSelectOnMap"
     />
   </div>
 </template>
