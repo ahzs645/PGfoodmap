@@ -50,15 +50,15 @@ function getHazardColor(rating) {
   <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
       <!-- Header -->
-      <div class="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 to-blue-700 rounded-t-xl">
+      <div class="p-6 border-b border-gray-200 dark:border-gray-700 bg-blue-600 dark:bg-gray-700 rounded-t-xl">
         <div class="flex items-start justify-between">
           <div class="text-white">
             <h2 class="text-xl font-bold">{{ restaurant.name }}</h2>
-            <p class="text-blue-100 text-sm mt-1">{{ restaurant.full_address || restaurant.address }}</p>
+            <p class="text-blue-100 dark:text-gray-400 text-sm mt-1">{{ restaurant.full_address || restaurant.address }}</p>
           </div>
           <button
             @click="emit('close')"
-            class="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
+            class="text-white hover:bg-blue-700 dark:hover:bg-gray-600 rounded-lg p-2 transition-colors"
           >
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -70,22 +70,22 @@ function getHazardColor(rating) {
         <div class="flex gap-6 mt-4">
           <div>
             <div class="text-2xl font-bold text-white">{{ inspections.length }}</div>
-            <div class="text-xs text-blue-200">Inspections</div>
+            <div class="text-xs text-blue-200 dark:text-gray-400">Inspections</div>
           </div>
           <div>
             <div class="text-2xl font-bold text-white">{{ totalViolations }}</div>
-            <div class="text-xs text-blue-200">Total Violations</div>
+            <div class="text-xs text-blue-200 dark:text-gray-400">Total Violations</div>
           </div>
           <div>
-            <div class="text-2xl font-bold text-red-300">{{ totalCritical }}</div>
-            <div class="text-xs text-blue-200">Critical</div>
+            <div class="text-2xl font-bold text-red-300 dark:text-red-400">{{ totalCritical }}</div>
+            <div class="text-xs text-blue-200 dark:text-gray-400">Critical</div>
           </div>
           <div>
             <div class="text-sm font-medium px-3 py-1 rounded-full"
                  :class="getHazardColor(restaurant.current_hazard_rating || restaurant.hazard_rating)">
               {{ restaurant.current_hazard_rating || restaurant.hazard_rating || 'Unknown' }}
             </div>
-            <div class="text-xs text-blue-200 mt-1">Current Rating</div>
+            <div class="text-xs text-blue-200 dark:text-gray-400 mt-1">Current Rating</div>
           </div>
         </div>
       </div>

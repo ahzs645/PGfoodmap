@@ -74,7 +74,8 @@ function getMarkerColor(restaurant) {
     const stats = restaurant.violationStats || { total: 0 }
     return getViolationColor(stats.total)
   } else {
-    const rating = restaurant.current_hazard_rating || restaurant.hazard_rating || 'Unknown'
+    // Use hazardRatingAtDate for timeline-based hazard visualization
+    const rating = restaurant.hazardRatingAtDate || restaurant.current_hazard_rating || restaurant.hazard_rating || 'Unknown'
     return getHazardColor(rating)
   }
 }
@@ -127,9 +128,14 @@ function createPopupContent(restaurant) {
 function updateSource() {
   if (!map || !map.getSource('restaurants')) return
 
+  // Filter out restaurants with null/undefined coordinates
+  const validRestaurants = props.restaurants.filter(
+    r => r.latitude != null && r.longitude != null
+  )
+
   const geojson = {
     type: 'FeatureCollection',
-    features: props.restaurants.map(r => {
+    features: validRestaurants.map(r => {
       const stats = r.violationStats || { total: 0, critical: 0 }
       const rating = r.current_hazard_rating || r.hazard_rating || 'Unknown'
       return {
@@ -165,7 +171,7 @@ function addLayers() {
   }
 
   // Remove existing layers if they exist
-  const layerIds = ['restaurants-glow', 'restaurants-circle', 'restaurants-labels']
+  const layerIds = ['restaurants-glow', 'restaurants-circle']
   layerIds.forEach(id => {
     if (map.getLayer(id)) map.removeLayer(id)
   })
@@ -200,26 +206,6 @@ function addLayers() {
     }
   })
 
-  // Add labels for violations mode
-  if (props.visualizationMode === 'violations') {
-    map.addLayer({
-      id: 'restaurants-labels',
-      type: 'symbol',
-      source: 'restaurants',
-      filter: ['>', ['get', 'violation_count'], 0],
-      layout: {
-        'text-field': ['get', 'violation_count'],
-        'text-size': 10,
-        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-        'text-allow-overlap': true
-      },
-      paint: {
-        'text-color': '#ffffff',
-        'text-halo-color': 'rgba(0,0,0,0.5)',
-        'text-halo-width': 1
-      }
-    })
-  }
 
   // Add click handler
   map.on('click', 'restaurants-circle', handleMapClick)
@@ -296,7 +282,8 @@ watch(() => props.isDark, (isDark) => {
 
   map.setStyle(isDark ? DARK_STYLE : LIGHT_STYLE)
 
-  map.once('style.load', () => {
+  // Use 'idle' event which fires after style is fully loaded and rendered
+  map.once('idle', () => {
     map.setCenter(center)
     map.setZoom(zoom)
     map.setBearing(bearing)

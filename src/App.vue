@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import RestaurantMap from './components/RestaurantMap.vue'
 import Sidebar from './components/Sidebar.vue'
 import InspectionPanel from './components/InspectionPanel.vue'
+import Timeline from './components/Timeline.vue'
 import { useRestaurantData } from './composables/useRestaurantData'
 import { useDarkMode } from './composables/useDarkMode'
 
@@ -27,6 +28,10 @@ const cutoffDate = computed(() => {
   return date
 })
 
+// Hazard timeline date (for hazard mode) - snap to first of month
+const now = new Date()
+const hazardTimelineDate = ref(new Date(now.getFullYear(), now.getMonth(), 1))
+
 const { restaurants, loading, error, stats } = useRestaurantData()
 
 // Parse date string like "18-Mar-2024" or "March 18, 2024"
@@ -49,12 +54,60 @@ function parseInspectionDate(dateStr) {
   return null
 }
 
+// Calculate date range from all inspections
+const inspectionDateRange = computed(() => {
+  let minDate = new Date()
+  let maxDate = new Date(2020, 0, 1)
+
+  restaurants.value.forEach(r => {
+    (r.inspections || []).forEach(insp => {
+      const date = parseInspectionDate(insp.date || insp.inspection_date)
+      if (date) {
+        if (date < minDate) minDate = date
+        if (date > maxDate) maxDate = date
+      }
+    })
+  })
+
+  // Add some padding
+  const start = new Date(minDate)
+  start.setMonth(start.getMonth() - 1)
+  const end = new Date()
+
+  return { start, end }
+})
+
+// Get hazard rating at a specific date for a restaurant
+function getHazardRatingAtDate(restaurant, targetDate) {
+  const inspections = restaurant.inspections || []
+  if (inspections.length === 0) return restaurant.hazard_rating || 'Unknown'
+
+  // Sort inspections by date descending
+  const sortedInspections = [...inspections]
+    .map(insp => ({
+      ...insp,
+      parsedDate: parseInspectionDate(insp.date || insp.inspection_date)
+    }))
+    .filter(insp => insp.parsedDate)
+    .sort((a, b) => b.parsedDate - a.parsedDate)
+
+  // Find the most recent inspection before or on the target date
+  const inspectionAtDate = sortedInspections.find(insp => insp.parsedDate <= targetDate)
+
+  if (inspectionAtDate) {
+    return inspectionAtDate.hazard_rating || restaurant.hazard_rating || 'Unknown'
+  }
+
+  // If no inspection before target date, return Unknown (restaurant may not have existed yet)
+  return 'Unknown'
+}
+
 // Compute violation stats for each restaurant within the timeline
 const restaurantsWithStats = computed(() => {
   return restaurants.value.map(r => {
     const inspections = r.inspections || []
 
-    // Filter inspections by cutoff date
+    // Filter inspections by cutoff date (for violations mode)
     const filteredInspections = cutoffDate.value
       ? inspections.filter(insp => {
           const date = parseInspectionDate(insp.date || insp.inspection_date)
@@ -73,9 +126,13 @@ const restaurantsWithStats = computed(() => {
       nonCriticalViolations += (insp.non_critical_violations_count || 0)
     })
 
+    // Get hazard rating at the timeline date (for hazard mode)
+    const hazardRatingAtDate = getHazardRatingAtDate(r, hazardTimelineDate.value)
+
     return {
       ...r,
       filteredInspections,
+      hazardRatingAtDate,
       violationStats: {
         total: totalViolations,
         critical: criticalViolations,
@@ -88,7 +145,12 @@ const restaurantsWithStats = computed(() => {
 
 const filteredRestaurants = computed(() => {
   return restaurantsWithStats.value.filter(r => {
-    const matchesHazard = selectedHazardRatings.value.includes(r.current_hazard_rating || r.hazard_rating || 'Unknown')
+    // In hazard mode, filter by the rating at the selected date
+    const ratingToCheck = visualizationMode.value === 'hazard'
+      ? r.hazardRatingAtDate
+      : (r.current_hazard_rating || r.hazard_rating || 'Unknown')
+
+    const matchesHazard = selectedHazardRatings.value.includes(ratingToCheck)
     const matchesFacility = selectedFacilityTypes.value.includes(r.facility_type || 'Unknown')
     const matchesSearch = !searchQuery.value ||
       r.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
@@ -109,6 +171,16 @@ const timelineStats = computed(() => {
     criticalViolations: all.reduce((sum, r) => sum + r.violationStats.critical, 0),
     totalInspections: all.reduce((sum, r) => sum + r.violationStats.inspectionCount, 0),
     restaurantsWithViolations: all.filter(r => r.violationStats.total > 0).length
+  }
+})
+
+// Hazard stats at the selected date
+const hazardStatsAtDate = computed(() => {
+  const all = restaurantsWithStats.value
+  return {
+    Low: all.filter(r => r.hazardRatingAtDate === 'Low').length,
+    Moderate: all.filter(r => r.hazardRatingAtDate === 'Moderate').length,
+    Unknown: all.filter(r => r.hazardRatingAtDate === 'Unknown').length
   }
 })
 
@@ -142,6 +214,7 @@ function openInspectionPanel() {
       :error="error"
       :stats="stats"
       :timeline-stats="timelineStats"
+      :hazard-stats-at-date="hazardStatsAtDate"
       :selected-restaurant="selectedRestaurant"
       :search-query="searchQuery"
       :selected-hazard-ratings="selectedHazardRatings"
@@ -185,6 +258,20 @@ function openInspectionPanel() {
         @restaurant-click="handleMapRestaurantClick"
       />
 
+      <!-- Timeline (Hazard Mode) -->
+      <div
+        v-if="visualizationMode === 'hazard'"
+        class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10"
+      >
+        <Timeline
+          :start-date="inspectionDateRange.start"
+          :end-date="inspectionDateRange.end"
+          :current-date="hazardTimelineDate"
+          :is-dark="isDark"
+          @update:current-date="hazardTimelineDate = $event"
+        />
+      </div>
+
       <!-- Map Legend -->
       <div class="absolute bottom-6 right-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 z-10">
         <h4 class="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">
@@ -213,19 +300,19 @@ function openInspectionPanel() {
           </div>
         </div>
 
-        <!-- Hazard rating legend -->
+        <!-- Hazard rating legend with counts -->
         <div v-else class="space-y-1">
           <div class="flex items-center gap-2">
             <span class="w-4 h-4 rounded-full bg-green-500"></span>
-            <span class="text-xs text-gray-600 dark:text-gray-300">Low</span>
+            <span class="text-xs text-gray-600 dark:text-gray-300">Low ({{ hazardStatsAtDate.Low }})</span>
           </div>
           <div class="flex items-center gap-2">
             <span class="w-4 h-4 rounded-full bg-amber-500"></span>
-            <span class="text-xs text-gray-600 dark:text-gray-300">Moderate</span>
+            <span class="text-xs text-gray-600 dark:text-gray-300">Moderate ({{ hazardStatsAtDate.Moderate }})</span>
           </div>
           <div class="flex items-center gap-2">
             <span class="w-4 h-4 rounded-full bg-gray-500"></span>
-            <span class="text-xs text-gray-600 dark:text-gray-300">Unknown</span>
+            <span class="text-xs text-gray-600 dark:text-gray-300">Unknown ({{ hazardStatsAtDate.Unknown }})</span>
           </div>
         </div>
 
