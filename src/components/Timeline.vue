@@ -214,46 +214,46 @@ onUnmounted(() => {
         <span>{{ formattedEndDate }}</span>
       </div>
 
-      <div class="relative h-6">
+      <div class="relative">
         <!-- Progress bar background -->
-        <div class="absolute inset-y-0 left-0 right-0 flex items-center">
+        <div class="relative h-4 flex items-center">
           <div class="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
             <div
               class="h-full bg-blue-500 transition-all duration-100"
               :style="{ width: `${progress}%` }"
             ></div>
           </div>
+
+          <!-- Custom thumb -->
+          <div
+            class="absolute top-1/2 transform -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md pointer-events-none transition-all"
+            :style="{ left: `${progress}%` }"
+          ></div>
+
+          <!-- Slider input (invisible, for interaction) -->
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="0.1"
+            :value="progress"
+            @input="handleSliderChange"
+            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          />
         </div>
 
-        <!-- Year markers -->
-        <div class="absolute inset-y-0 left-0 right-0 pointer-events-none">
+        <!-- Year markers (below the track) -->
+        <div class="relative h-4 mt-1">
           <div
             v-for="marker in yearMarkers"
             :key="marker.year"
-            class="absolute top-0 transform -translate-x-1/2"
+            class="absolute transform -translate-x-1/2 flex flex-col items-center"
             :style="{ left: `${marker.position}%` }"
           >
-            <div class="w-0.5 h-3 bg-gray-400 dark:bg-gray-500"></div>
-            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ marker.year }}</span>
+            <div class="w-0.5 h-2 bg-gray-400 dark:bg-gray-500"></div>
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{{ marker.year }}</span>
           </div>
         </div>
-
-        <!-- Slider input -->
-        <input
-          type="range"
-          min="0"
-          max="100"
-          step="0.1"
-          :value="progress"
-          @input="handleSliderChange"
-          class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
-
-        <!-- Custom thumb -->
-        <div
-          class="absolute top-1/2 transform -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md pointer-events-none transition-all"
-          :style="{ left: `${progress}%` }"
-        ></div>
       </div>
     </div>
 
