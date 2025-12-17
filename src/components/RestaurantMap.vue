@@ -11,6 +11,18 @@ const props = defineProps({
   selectedRestaurant: {
     type: Object,
     default: null
+  },
+  timelineMonths: {
+    type: Number,
+    default: 12
+  },
+  visualizationMode: {
+    type: String,
+    default: 'violations'
+  },
+  isDark: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -24,48 +36,90 @@ let popup = null
 const CENTER = [-122.764593, 53.909784]
 const ZOOM = 12
 
+// Map styles
+const LIGHT_STYLE = 'https://tiles.openfreemap.org/styles/bright'
+const DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark'
+
 // Hazard rating colors
 const HAZARD_COLORS = {
-  'Low': '#22c55e',      // green
-  'Moderate': '#f59e0b', // amber
-  'Unknown': '#6b7280'   // gray
+  'Low': '#22c55e',
+  'Moderate': '#f59e0b',
+  'Unknown': '#6b7280'
 }
 
-function getHazardColor(restaurant) {
-  const rating = restaurant.current_hazard_rating || restaurant.hazard_rating || 'Unknown'
+// Get color based on violation count
+function getViolationColor(violationCount) {
+  if (violationCount === 0) return '#22c55e'
+  if (violationCount <= 3) return '#eab308'
+  if (violationCount <= 6) return '#f97316'
+  return '#ef4444'
+}
+
+// Get color based on hazard rating
+function getHazardColor(rating) {
   return HAZARD_COLORS[rating] || HAZARD_COLORS['Unknown']
+}
+
+// Get radius based on violation count (for violations mode)
+function getRadius(violationCount, mode) {
+  if (mode === 'hazard') return 10
+  const baseRadius = 8
+  const maxRadius = 20
+  const scale = Math.min(violationCount / 10, 1)
+  return baseRadius + (maxRadius - baseRadius) * scale
+}
+
+function getMarkerColor(restaurant) {
+  if (props.visualizationMode === 'violations') {
+    const stats = restaurant.violationStats || { total: 0 }
+    return getViolationColor(stats.total)
+  } else {
+    const rating = restaurant.current_hazard_rating || restaurant.hazard_rating || 'Unknown'
+    return getHazardColor(rating)
+  }
 }
 
 function createPopupContent(restaurant) {
   const rating = restaurant.current_hazard_rating || restaurant.hazard_rating || 'Unknown'
-  const colorClass = rating === 'Low' ? 'bg-green-500' : rating === 'Moderate' ? 'bg-amber-500' : 'bg-gray-500'
+  const stats = restaurant.violationStats || { total: 0, critical: 0, inspectionCount: 0 }
 
-  const latestInspection = restaurant.inspections?.[0]
+  const hazardColorClass = rating === 'Low' ? 'bg-green-500'
+    : rating === 'Moderate' ? 'bg-amber-500'
+    : 'bg-gray-500'
+
+  const violationColorClass = stats.total === 0 ? 'bg-green-500'
+    : stats.total <= 3 ? 'bg-yellow-500'
+    : stats.total <= 6 ? 'bg-orange-500'
+    : 'bg-red-500'
+
+  const latestInspection = restaurant.filteredInspections?.[0] || restaurant.inspections?.[0]
   const inspectionInfo = latestInspection
     ? `<div class="mt-2 text-sm text-gray-600">
-        <div class="font-medium">Latest Inspection: ${latestInspection.inspection_date || latestInspection.date}</div>
-        <div>Type: ${latestInspection.inspection_type || latestInspection.type}</div>
-        <div>Critical Violations: ${latestInspection.critical_violations_count || 0}</div>
+        <div class="font-medium">Latest: ${latestInspection.inspection_date || latestInspection.date}</div>
+        <div>${latestInspection.inspection_type || latestInspection.type}</div>
       </div>`
     : ''
 
   return `
     <div class="p-4 max-w-xs">
+      <div class="font-semibold text-gray-900 mb-1">${restaurant.name}</div>
+      <div class="text-sm text-gray-600 mb-2">${restaurant.full_address || restaurant.address}</div>
+
       <div class="flex items-center gap-2 mb-2">
-        <span class="w-3 h-3 rounded-full ${colorClass}"></span>
-        <span class="font-semibold text-gray-900">${restaurant.name}</span>
+        <span class="text-xs px-2 py-1 rounded ${hazardColorClass} text-white">
+          ${rating}
+        </span>
+        <span class="text-xs px-2 py-1 rounded ${violationColorClass} text-white">
+          ${stats.total} violation${stats.total !== 1 ? 's' : ''}
+        </span>
       </div>
-      <div class="text-sm text-gray-600">${restaurant.full_address || restaurant.address}</div>
-      <div class="mt-2 flex items-center gap-2">
-        <span class="text-xs px-2 py-1 rounded ${colorClass} text-white">${rating}</span>
-        <span class="text-xs text-gray-500">${restaurant.facility_type || 'Restaurant'}</span>
+
+      <div class="text-xs text-gray-500 mb-2">
+        ${stats.inspectionCount} inspection${stats.inspectionCount !== 1 ? 's' : ''} |
+        ${stats.critical} critical
       </div>
+
       ${inspectionInfo}
-      <div class="mt-3">
-        <a href="${restaurant.details_url}" target="_blank" class="text-blue-600 text-sm hover:underline">
-          View on HealthSpace →
-        </a>
-      </div>
     </div>
   `
 }
@@ -75,30 +129,125 @@ function updateSource() {
 
   const geojson = {
     type: 'FeatureCollection',
-    features: props.restaurants.map(r => ({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [r.longitude, r.latitude]
-      },
-      properties: {
-        id: r.details_url,
-        name: r.name,
-        address: r.full_address || r.address,
-        hazard_rating: r.current_hazard_rating || r.hazard_rating || 'Unknown',
-        facility_type: r.facility_type || 'Unknown',
-        color: getHazardColor(r)
+    features: props.restaurants.map(r => {
+      const stats = r.violationStats || { total: 0, critical: 0 }
+      const rating = r.current_hazard_rating || r.hazard_rating || 'Unknown'
+      return {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [r.longitude, r.latitude]
+        },
+        properties: {
+          id: r.details_url,
+          name: r.name,
+          address: r.full_address || r.address,
+          hazard_rating: rating,
+          facility_type: r.facility_type || 'Unknown',
+          violation_count: stats.total,
+          critical_count: stats.critical,
+          color: getMarkerColor(r),
+          radius: getRadius(stats.total, props.visualizationMode)
+        }
       }
-    }))
+    })
   }
 
   map.getSource('restaurants').setData(geojson)
 }
 
+function addLayers() {
+  if (!map.getSource('restaurants')) {
+    map.addSource('restaurants', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] }
+    })
+  }
+
+  // Remove existing layers if they exist
+  const layerIds = ['restaurants-glow', 'restaurants-circle', 'restaurants-labels']
+  layerIds.forEach(id => {
+    if (map.getLayer(id)) map.removeLayer(id)
+  })
+
+  // Add glow layer for high-violation restaurants (only in violations mode)
+  if (props.visualizationMode === 'violations') {
+    map.addLayer({
+      id: 'restaurants-glow',
+      type: 'circle',
+      source: 'restaurants',
+      filter: ['>', ['get', 'violation_count'], 3],
+      paint: {
+        'circle-radius': ['+', ['get', 'radius'], 6],
+        'circle-color': ['get', 'color'],
+        'circle-opacity': 0.3,
+        'circle-blur': 1
+      }
+    })
+  }
+
+  // Add circle layer
+  map.addLayer({
+    id: 'restaurants-circle',
+    type: 'circle',
+    source: 'restaurants',
+    paint: {
+      'circle-radius': ['get', 'radius'],
+      'circle-color': ['get', 'color'],
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 2,
+      'circle-opacity': 0.9
+    }
+  })
+
+  // Add labels for violations mode
+  if (props.visualizationMode === 'violations') {
+    map.addLayer({
+      id: 'restaurants-labels',
+      type: 'symbol',
+      source: 'restaurants',
+      filter: ['>', ['get', 'violation_count'], 0],
+      layout: {
+        'text-field': ['get', 'violation_count'],
+        'text-size': 10,
+        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+        'text-allow-overlap': true
+      },
+      paint: {
+        'text-color': '#ffffff',
+        'text-halo-color': 'rgba(0,0,0,0.5)',
+        'text-halo-width': 1
+      }
+    })
+  }
+
+  // Add click handler
+  map.on('click', 'restaurants-circle', handleMapClick)
+  map.on('mouseenter', 'restaurants-circle', () => {
+    map.getCanvas().style.cursor = 'pointer'
+  })
+  map.on('mouseleave', 'restaurants-circle', () => {
+    map.getCanvas().style.cursor = ''
+  })
+}
+
+function handleMapClick(e) {
+  if (e.features.length > 0) {
+    const feature = e.features[0]
+    const restaurant = props.restaurants.find(
+      r => r.details_url === feature.properties.id
+    )
+    if (restaurant) {
+      emit('restaurant-click', restaurant)
+      showPopup(restaurant, e.lngLat)
+    }
+  }
+}
+
 function initMap() {
   map = new maplibregl.Map({
     container: mapContainer.value,
-    style: 'https://tiles.openfreemap.org/styles/bright',
+    style: props.isDark ? DARK_STYLE : LIGHT_STYLE,
     center: CENTER,
     zoom: ZOOM
   })
@@ -106,67 +255,13 @@ function initMap() {
   map.addControl(new maplibregl.NavigationControl(), 'top-right')
 
   map.on('load', () => {
-    // Add restaurant source
-    map.addSource('restaurants', {
-      type: 'geojson',
-      data: {
-        type: 'FeatureCollection',
-        features: []
-      }
-    })
-
-    // Add circle layer for restaurants
-    map.addLayer({
-      id: 'restaurants-circle',
-      type: 'circle',
-      source: 'restaurants',
-      paint: {
-        'circle-radius': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          10, 6,
-          14, 10,
-          18, 16
-        ],
-        'circle-color': ['get', 'color'],
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 2,
-        'circle-opacity': 0.9
-      }
-    })
-
-    // Click handler for restaurants
-    map.on('click', 'restaurants-circle', (e) => {
-      if (e.features.length > 0) {
-        const feature = e.features[0]
-        const restaurant = props.restaurants.find(
-          r => r.details_url === feature.properties.id
-        )
-        if (restaurant) {
-          emit('restaurant-click', restaurant)
-          showPopup(restaurant, e.lngLat)
-        }
-      }
-    })
-
-    // Change cursor on hover
-    map.on('mouseenter', 'restaurants-circle', () => {
-      map.getCanvas().style.cursor = 'pointer'
-    })
-
-    map.on('mouseleave', 'restaurants-circle', () => {
-      map.getCanvas().style.cursor = ''
-    })
-
+    addLayers()
     updateSource()
   })
 }
 
 function showPopup(restaurant, lngLat) {
-  if (popup) {
-    popup.remove()
-  }
+  if (popup) popup.remove()
 
   popup = new maplibregl.Popup({
     closeButton: true,
@@ -190,6 +285,34 @@ function flyToRestaurant(restaurant) {
   showPopup(restaurant)
 }
 
+// Watch for dark mode changes
+watch(() => props.isDark, (isDark) => {
+  if (!map) return
+
+  const center = map.getCenter()
+  const zoom = map.getZoom()
+  const bearing = map.getBearing()
+  const pitch = map.getPitch()
+
+  map.setStyle(isDark ? DARK_STYLE : LIGHT_STYLE)
+
+  map.once('style.load', () => {
+    map.setCenter(center)
+    map.setZoom(zoom)
+    map.setBearing(bearing)
+    map.setPitch(pitch)
+    addLayers()
+    updateSource()
+  })
+})
+
+// Watch for visualization mode changes
+watch(() => props.visualizationMode, () => {
+  if (!map || !map.isStyleLoaded()) return
+  addLayers()
+  updateSource()
+})
+
 watch(() => props.restaurants, () => {
   updateSource()
 }, { deep: true })
@@ -205,14 +328,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (map) {
-    map.remove()
-  }
+  if (map) map.remove()
 })
 
-defineExpose({
-  flyToRestaurant
-})
+defineExpose({ flyToRestaurant })
 </script>
 
 <template>
