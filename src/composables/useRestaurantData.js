@@ -12,7 +12,7 @@ export function useRestaurantData() {
     state.error = null
 
     try {
-      const response = await fetch('/data/restaurants.json')
+      const response = await fetch(`${import.meta.env.BASE_URL}data/restaurants.json`)
       if (!response.ok) {
         throw new Error(`Failed to load data: ${response.status}`)
       }
