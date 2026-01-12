@@ -35,6 +35,8 @@ interface SidebarProps {
   onOpenInspectionPanel: () => void
   onToggleDarkMode: () => void
   onOpenRoulette: () => void
+  showTimeline: boolean
+  onToggleTimeline: () => void
 }
 
 const hazardOptions: HazardRating[] = ['Low', 'Moderate', 'Unknown']
@@ -77,7 +79,9 @@ export function Sidebar({
   onClearSelection,
   onOpenInspectionPanel,
   onToggleDarkMode,
-  onOpenRoulette
+  onOpenRoulette,
+  showTimeline,
+  onToggleTimeline
 }: SidebarProps) {
   const [showFilters, setShowFilters] = useState(false)
 
@@ -120,6 +124,19 @@ export function Sidebar({
             >
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <button
+              onClick={onToggleTimeline}
+              className={`p-2 rounded-lg transition-colors ${
+                showTimeline
+                  ? 'bg-blue-500 hover:bg-blue-600'
+                  : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+              title={showTimeline ? 'Hide Timeline' : 'Show Timeline'}
+            >
+              <svg className={`w-5 h-5 ${showTimeline ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>
             <button

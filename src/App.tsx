@@ -46,6 +46,9 @@ function App() {
   // Visualization mode: 'hazard' or 'violations'
   const [visualizationMode, setVisualizationMode] = useState<VisualizationMode>('violations')
 
+  // Timeline toggle
+  const [showTimeline, setShowTimeline] = useState(false)
+
   // Timeline filter - default to past year
   const [timelineMonths, setTimelineMonths] = useState(12)
   const cutoffDate = useMemo(() => {
@@ -248,6 +251,8 @@ function App() {
           onOpenInspectionPanel={openInspectionPanel}
           onToggleDarkMode={toggleDarkMode}
           onOpenRoulette={() => setShowRoulette(true)}
+          showTimeline={showTimeline}
+          onToggleTimeline={() => setShowTimeline(!showTimeline)}
         />
       )}
 
@@ -278,8 +283,8 @@ function App() {
           onRestaurantClick={handleMapRestaurantClick}
         />
 
-        {/* Timeline (Hazard Mode) */}
-        {visualizationMode === 'hazard' && (
+        {/* Timeline */}
+        {showTimeline && (
           <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10">
             <Timeline
               startDate={inspectionDateRange.start}
