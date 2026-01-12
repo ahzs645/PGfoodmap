@@ -79,7 +79,7 @@ export function Sidebar({
   onToggleDarkMode,
   onOpenRoulette
 }: SidebarProps) {
-  const [showFilters, setShowFilters] = useState(true)
+  const [showFilters, setShowFilters] = useState(false)
 
   const toggleHazard = useCallback((hazard: HazardRating) => {
     const current = [...selectedHazardRatings]
@@ -115,7 +115,7 @@ export function Sidebar({
           <div className="flex items-center gap-2">
             <button
               onClick={onOpenRoulette}
-              className="p-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 transition-all shadow-sm hover:shadow-md"
+              className="p-2 rounded-lg bg-purple-500 hover:bg-purple-600 transition-colors"
               title="Restaurant Roulette"
             >
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
