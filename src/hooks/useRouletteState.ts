@@ -90,7 +90,7 @@ export function useRouletteState(allRestaurants: Restaurant[]) {
   const [spinnerMode, setSpinnerMode] = useState<SpinnerMode>('wheel')
 
   // Wheel display state
-  const [wheelSize, setWheelSize] = useState(8)
+  const [wheelSize, setWheelSize] = useState(65)
   const [wheelRestaurants, setWheelRestaurants] = useState<RouletteRestaurant[]>([])
 
   // Computed: filtered restaurants for roulette
@@ -178,9 +178,10 @@ export function useRouletteState(allRestaurants: Restaurant[]) {
       return
     }
 
-    // Take up to wheelSize random restaurants
+    // Take up to wheelSize random restaurants (0 means all)
     const shuffled = shuffleArray(eligible)
-    setWheelRestaurants(shuffled.slice(0, Math.min(wheelSize, eligible.length)))
+    const count = wheelSize === 0 ? eligible.length : Math.min(wheelSize, eligible.length)
+    setWheelRestaurants(shuffled.slice(0, count))
   }, [eligibleRestaurants, wheelSize])
 
   // Spin the wheel and select a winner
@@ -204,6 +205,18 @@ export function useRouletteState(allRestaurants: Restaurant[]) {
       return wheelRestaurants[idx]
     }
   }, [spinnerMode, eligibleRestaurants, wheelRestaurants])
+
+  // Start spinning without picking winner (for wheel mode where wheel picks)
+  const startSpinning = useCallback(() => {
+    setIsSpinning(true)
+    setHasSpun(true)
+  }, [])
+
+  // Complete spinning with winner from wheel
+  const completeSpinningWithWinner = useCallback((winnerRestaurant: RouletteRestaurant) => {
+    setWinner(winnerRestaurant)
+    setIsSpinning(false)
+  }, [])
 
   // Complete spinning (called after animation)
   const completeSpinning = useCallback(() => {
@@ -231,7 +244,7 @@ export function useRouletteState(allRestaurants: Restaurant[]) {
     setWinnerIndex(null)
     setHasSpun(false)
     setIsSpinning(false)
-    setWheelSize(8)
+    setWheelSize(65)
     setWheelRestaurants([])
   }, [])
 
@@ -271,7 +284,9 @@ export function useRouletteState(allRestaurants: Restaurant[]) {
     toggleHazardExclusion,
     shuffleWheel,
     spin,
+    startSpinning,
     completeSpinning,
+    completeSpinningWithWinner,
     resetSpin,
     resetFilters
   }

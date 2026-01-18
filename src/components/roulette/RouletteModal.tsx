@@ -13,8 +13,8 @@ interface RouletteModalProps {
   onSelectOnMap: (restaurant: RestaurantWithStats) => void
 }
 
-// Wheel size options
-const wheelSizeOptions = [4, 6, 8, 10]
+// Wheel size options (0 means "All")
+const wheelSizeOptions = [4, 6, 8, 10, 65, 0]
 
 export function RouletteModal({
   restaurants,
@@ -49,7 +49,9 @@ export function RouletteModal({
     toggleHazardExclusion,
     shuffleWheel,
     spin,
+    startSpinning,
     completeSpinning,
+    completeSpinningWithWinner,
     resetSpin,
     resetFilters
   } = useRouletteState(restaurants)
@@ -251,13 +253,13 @@ export function RouletteModal({
                     <button
                       key={size}
                       onClick={() => setWheelSize(size)}
-                      className={`w-8 h-8 text-sm font-medium rounded-lg transition-colors ${
+                      className={`${size === 0 ? 'px-2' : 'w-8'} h-8 text-sm font-medium rounded-lg transition-colors ${
                         wheelSize === size
                           ? 'bg-purple-500 text-white'
                           : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
                       }`}
                     >
-                      {size}
+                      {size === 0 ? 'All' : size}
                     </button>
                   ))}
                 </div>
@@ -302,13 +304,12 @@ export function RouletteModal({
               />
             )}
 
-            {/* Wheel Mode: Show wheel */}
+            {/* Wheel Mode: Show wheel (has spin button in center) */}
             {spinnerMode === 'wheel' && !(hasSpun && !isSpinning && winner) && (
               <RouletteWheel
                 restaurants={wheelRestaurants}
-                winnerIndex={winnerIndex}
-                isSpinning={isSpinning}
-                onSpinComplete={handleSpinComplete}
+                onSpinStart={startSpinning}
+                onSpinComplete={completeSpinningWithWinner}
               />
             )}
 
@@ -347,8 +348,8 @@ export function RouletteModal({
               </div>
             )}
 
-            {/* Reshuffle button (for wheel mode when not spinning) */}
-            {spinnerMode === 'wheel' && !hasSpun && !isSpinning && eligibleRestaurants.length > wheelSize && (
+            {/* Reshuffle button (for wheel mode when not spinning, hidden when "All" is selected) */}
+            {spinnerMode === 'wheel' && !hasSpun && !isSpinning && wheelSize !== 0 && eligibleRestaurants.length > wheelSize && (
               <button
                 onClick={shuffleWheel}
                 className="mt-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -360,11 +361,11 @@ export function RouletteModal({
               </button>
             )}
 
-            {/* Spin button: show when not spun yet, or while spinning */}
-            {(!hasSpun || isSpinning) && (
+            {/* Spin button: only show for slot mode (wheel has its own button in center) */}
+            {spinnerMode === 'slot' && (!hasSpun || isSpinning) && (
               <button
                 onClick={handleSpin}
-                disabled={(spinnerMode === 'slot' ? eligibleRestaurants.length === 0 : wheelRestaurants.length === 0) || isSpinning}
+                disabled={eligibleRestaurants.length === 0 || isSpinning}
                 className="mt-6 px-8 py-4 text-xl font-bold rounded-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white shadow-lg transform transition-all hover:scale-105 active:scale-95 disabled:hover:scale-100"
               >
                 {isSpinning ? (
